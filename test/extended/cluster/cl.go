@@ -13,6 +13,9 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	kclientset "k8s.io/client-go/kubernetes"
 	e2e "k8s.io/kubernetes/test/e2e/framework"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/api/core/v1"
+	"k8s.io/kubernetes/staging/src/k8s.io/apimachinery/pkg/util/json"
 
 	oapi "github.com/openshift/origin/pkg/api"
 	projectapi "github.com/openshift/origin/pkg/project/apis/project"
@@ -79,6 +82,9 @@ var _ = g.Describe("[Feature:Performance][Serial][Slow] Load cluster", func() {
 				err := oc.Run("new-project").Args(nsName).Execute()
 				o.Expect(err).NotTo(o.HaveOccurred())
 				e2e.Logf("%d/%d : Created new namespace: %v", j+1, p.Number, nsName)
+				// label namespace nsName
+				_, err = labelNamespace(c, nsName, p.Labels)
+				o.Expect(err).NotTo(o.HaveOccurred())
 				namespaces = append(namespaces, nsName)
 
 				// Create config maps
@@ -200,6 +206,19 @@ func newProject(nsName string) *projectapi.Project {
 			},
 		},
 	}
+}
+
+func labelNamespace(c kclientset.Interface, ns string, pairs map[string]string) (*v1.Namespace, error) {
+	if len(pairs) == 0 {
+		return nil, nil
+	}
+	var d struct{ Metadata metav1.ObjectMeta `json:"metadata"`}
+	d.Metadata = metav1.ObjectMeta{Labels:pairs}
+	bytes,err := json.Marshal(d)
+	if err != nil {
+		return nil, err
+	}
+	return c.CoreV1().Namespaces().Patch(ns, types.MergePatchType, bytes)
 }
 
 // mkPath returns fully qualfied file location as a string
