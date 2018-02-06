@@ -4,29 +4,29 @@ import (
 	"time"
 )
 
-// All SLOs are defined in the cluster-loader (cl) config file
+// All metrics are defined in the cluster-loader (cl) config file
 // except the ones mentioned otherwise
-type SLO interface {
+type Metrics interface {
 	passCheck() bool
 	printLog()
 }
 
-type BaseSLO struct {
+type BaseMetrics struct {
 	Name string `json:"name"`
 	Type string `json:"type"`
 	result bool // our cl vendors the value
 }
 
-type TestDurationSLO struct {
-	BaseSLO
+type TestDuration struct {
+	BaseMetrics
 	StartTime time.Time `json:"startTime"` // our cl vendors the value
 	TestDuration time.Duration `json:"testDuration"` // our cl vendors the value
 	DurationToPass time.Duration `json:"durationToPass"`
 }
 
 
-type ResourceStateSLO struct {
-	BaseSLO
+type ResourceState struct {
+	BaseMetrics
 	// k8s/oc resources type, eg, current version of cl supports build, dc
 	// may allow for pod, rc ...
 	ResourceType string `json:"resourceType"`
@@ -41,27 +41,27 @@ type ResourceStateSLO struct {
 	Selector map[string]string `json:"selector"`
 }
 
-type ExecutableSLO struct {
-	BaseSLO
+type Executable struct {
+	BaseMetrics
 	Path string `json:"path"`
 	Timeout time.Duration `json:"timeout"`
 	Stdout string `json:"stdout"` // our cl vendors the value
 	Stderr string `json:"stderr"` // our cl vendors the value
 }
 
-func (td TestDurationSLO) passCheck() bool {
+func (td TestDuration) passCheck() bool {
 	// TODO
 	// if DurationToPass is defined by config
 	// then compare with TestDuration to determine return value
 	return false
 }
 
-func (td TestDurationSLO) printLog() {
+func (td TestDuration) printLog() {
 	// TODO
 	// logging the object in json
 }
 
-func (rs ResourceStateSLO) passCheck() bool {
+func (rs ResourceState) passCheck() bool {
 	// TODO
 	// compare with operator Operator the number of desired resources
 	// using the selector Selector
@@ -70,12 +70,12 @@ func (rs ResourceStateSLO) passCheck() bool {
 	return false
 }
 
-func (rs ResourceStateSLO) printLog() {
+func (rs ResourceState) printLog() {
 	// TODO
 	// logging the object in json
 }
 
-func (e ExecutableSLO) passCheck() bool {
+func (e Executable) passCheck() bool {
 	// run the executable specified by the path Path
 	// with a timeout Timeout
 	// if the exit code is 0, then return true
@@ -83,15 +83,15 @@ func (e ExecutableSLO) passCheck() bool {
 	return false
 }
 
-func (e ExecutableSLO) printLog() {
+func (e Executable) printLog() {
 	// TODO
 	// logging the object in json
 }
 
 // expected to be run in cl
-func CheckSLOs(slos []SLO) {
-	for _, slo := range slos {
-		slo.passCheck()
-		slo.printLog()
+func CheckMetrics(slos []Metrics) {
+	for _, metrics := range slos {
+		metrics.passCheck()
+		metrics.printLog()
 	}
 }
