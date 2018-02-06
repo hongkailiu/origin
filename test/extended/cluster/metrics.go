@@ -89,9 +89,9 @@ func (e Executable) printLog() {
 }
 
 // expected to be run in cl
-func CheckMetrics(slos []Metrics) {
-	for _, metrics := range slos {
-		metrics.passCheck()
-		metrics.printLog()
+func CheckMetrics(metrics []Metrics) {
+	for _, m := range metrics {
+		m.passCheck()
+		m.printLog()
 	}
 }
