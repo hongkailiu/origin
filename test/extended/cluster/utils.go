@@ -21,6 +21,7 @@ import (
 	e2e "k8s.io/kubernetes/test/e2e/framework"
 
 	exutil "github.com/openshift/origin/test/extended/util"
+	"reflect"
 )
 
 // The number of times we re-try to create a pod
@@ -518,4 +519,44 @@ func SetNamespaceLabels(c kclientset.Interface, name string, labels map[string]s
 	}
 	ns.Labels = labels
 	return c.CoreV1().Namespaces().Update(ns)
+}
+
+func ProjectExists(oc *exutil.CLI, name string) (bool, error) {
+	p, err := oc.AdminProjectClient().Project().Projects().Get(name, metav1.GetOptions{})
+	if err != nil {
+		switch err.(type) {
+		//case *ErrZeroDivision:
+		//	fmt.Println(err.Error())
+		default:
+			fmt.Printf("============================tttype:%s\n", reflect.TypeOf(err))
+		}
+		if strings.Contains(err.Error(), "not found") {
+			return false, nil
+		}
+		return false, err
+	}
+	if name == (*p).Name {
+		return true, nil
+	}
+	return false, nil
+}
+
+func DeleteProject(oc *exutil.CLI, name string, interval, timeout time.Duration) error {
+	e2e.Logf("Deleting project %v ...", name)
+	err := oc.AdminProjectClient().Project().Projects().Delete(name, &metav1.DeleteOptions{})
+	if err != nil {
+		return err
+	}
+	err = wait.Poll(interval, timeout, func() (bool, error) {
+		exists, err := ProjectExists(oc, name)
+		if err != nil {
+			return true, err
+		}
+		if exists {
+			e2e.Logf("The project %v is still there", name)
+			return false, nil
+		}
+		return true, nil
+	})
+	return err
 }
