@@ -3,6 +3,7 @@ package cluster
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/openshift/origin/test/extended/cluster/metrics"
 	"io/ioutil"
 	"net"
 	"net/http"
@@ -135,7 +136,7 @@ func (p *ClusterLoaderObjectType) createPodStruct(ns string, labels map[string]s
 }
 
 // CreatePods creates pods in user defined namespaces with user configurable tuning sets
-func (p *ClusterLoaderObjectType) CreatePods(c kclientset.Interface, ns string, labels map[string]string, spec kapiv1.PodSpec, tuning *TuningSetType) error {
+func (p *ClusterLoaderObjectType) CreatePods(c kclientset.Interface, ns string, labels map[string]string, spec kapiv1.PodSpec, tuning *TuningSetType, step *metrics.PodStepDuration) error {
 	if len(spec.Containers) == 0 && p.Image == "" {
 		return fmt.Errorf("pod definition missing both spec and image (at least one is required)")
 	}
@@ -155,11 +156,14 @@ func (p *ClusterLoaderObjectType) CreatePods(c kclientset.Interface, ns string, 
 			if tuning.Pods.RateLimit.Delay != 0 {
 				framework.Logf("Sleeping %d ms between podcreation.", tuning.Pods.RateLimit.Delay)
 				time.Sleep(tuning.Pods.RateLimit.Delay * time.Millisecond)
+				(*step).RateDelayCount++
 			}
 			// If a stepping tuningset has been defined in the config, we wait for the step of pods to be created, and pause
 			if tuning.Pods.Stepping.StepSize != 0 && (i+1)%tuning.Pods.Stepping.StepSize == 0 {
 				framework.Logf("Waiting for pods created this step to be running")
+				waitStartTime := time.Now()
 				pods, err := exutil.WaitForPods(c.CoreV1().Pods(ns), exutil.ParseLabelsOrDie(mapToString(labels)), exutil.CheckPodIsRunning, i+1, tuning.Pods.Stepping.Timeout*time.Second)
+				(*step).WaitPodsDurations = append((*step).WaitPodsDurations, time.Since(waitStartTime))
 				if err != nil {
 					framework.Failf("Error in wait... %v", err)
 				} else if len(pods) < i+1 {
@@ -168,10 +172,12 @@ func (p *ClusterLoaderObjectType) CreatePods(c kclientset.Interface, ns string, 
 
 				framework.Logf("We have created %d pods and are now sleeping for %d seconds", i+1, tuning.Pods.Stepping.Pause)
 				time.Sleep(tuning.Pods.Stepping.Pause * time.Second)
+				(*step).StepPauseCount++
 			}
 		}
 	}
 
+	syncStartTime := time.Now()
 	if p.Sync.Running {
 		timeout, err := time.ParseDuration(p.Sync.Timeout)
 		if err != nil {
@@ -192,6 +198,9 @@ func (p *ClusterLoaderObjectType) CreatePods(c kclientset.Interface, ns string, 
 		}
 		return SyncSucceededPods(c, ns, p.Sync.Selectors, timeout)
 	}
+	endTime := time.Now()
+	(*step).SyncTime = endTime.Sub(syncStartTime)
+	(*step).TotalTime = endTime.Sub((*step).StartTime)
 	return nil
 }
 
@@ -468,7 +477,7 @@ func newConfigMap(ns string, name string, vars map[string]string) *kapiv1.Config
 }
 
 // CreateTemplates creates templates in user defined namespaces with user configurable tuning sets.
-func CreateTemplates(oc *exutil.CLI, c kclientset.Interface, nsName, config string, template ClusterLoaderObjectType, tuning *TuningSetType) error {
+func CreateTemplates(oc *exutil.CLI, c kclientset.Interface, nsName, config string, template ClusterLoaderObjectType, tuning *TuningSetType, step *metrics.TemplateStepDuration) error {
 	var allArgs []string
 	templateFile, err := mkPath(template.File, config)
 	if err != nil {
@@ -508,14 +517,17 @@ func CreateTemplates(oc *exutil.CLI, c kclientset.Interface, nsName, config stri
 			if tuning.Templates.RateLimit.Delay != 0 {
 				e2e.Logf("Sleeping %d ms between template creation.", tuning.Templates.RateLimit.Delay)
 				time.Sleep(time.Duration(tuning.Templates.RateLimit.Delay) * time.Millisecond)
+				(*step).RateDelayCount++
 			}
 			if tuning.Templates.Stepping.StepSize != 0 && (i+1)%tuning.Templates.Stepping.StepSize == 0 {
 				e2e.Logf("We have created %d templates and are now sleeping for %d seconds", i+1, tuning.Templates.Stepping.Pause)
 				time.Sleep(time.Duration(tuning.Templates.Stepping.Pause) * time.Second)
+				(*step).StepPauseCount++
 			}
 		}
 	}
 
+	syncStartTime := time.Now()
 	sync := template.Sync
 	if sync.Running {
 		timeout, err := time.ParseDuration(sync.Timeout)
@@ -547,6 +559,9 @@ func CreateTemplates(oc *exutil.CLI, c kclientset.Interface, nsName, config stri
 		}
 	}
 
+	endTime := time.Now()
+	(*step).SyncTime = endTime.Sub(syncStartTime)
+	(*step).TotalTime = endTime.Sub((*step).StartTime)
 	return nil
 }
 
