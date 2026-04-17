@@ -5,6 +5,7 @@ import (
 	_ "embed"
 	"fmt"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -441,6 +442,11 @@ func (i *InvariantInClusterDisruption) StartCollection(ctx context.Context, admi
 
 	// Extract the openshift-tests image from the release payload
 	oc = exutil.NewCLIForMonitorTest("default")
+	if splits := strings.Split(i.payloadImagePullSpec, ","); len(splits) > 1 {
+		i.notSupportedReason = "multi image pull specs specified: " + i.payloadImagePullSpec
+		log.Infof("Invalid OpenShift test image spec: %s", i.notSupportedReason)
+		return nil
+	}
 	i.openshiftTestsImagePullSpec, err = payload.ExtractImageFromReleasePayload(i.payloadImagePullSpec, "tests", oc)
 	if err != nil {
 		return fmt.Errorf("unable to determine openshift-tests image: %s: %v", i.payloadImagePullSpec, err)
