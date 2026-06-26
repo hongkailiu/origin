@@ -89,7 +89,7 @@ func testStableSystemOperatorStateTransitions(events monitorapi.Intervals, topol
 				return "https://issues.redhat.com/browse/OCPBUGS-42837"
 			}
 			if operator == "ingress" {
-				return "https://issues.redhat.com/browse/OCPBUGS-45921"
+				return "https://issues.redhat.com/browse/OCPBUGS-92835"
 			}
 			if operator == "kube-apiserver" {
 				return "https://issues.redhat.com/browse/OCPBUGS-38661"
